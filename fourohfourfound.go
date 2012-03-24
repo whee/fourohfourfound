@@ -37,19 +37,25 @@ type HandlerConfig struct {
 	redirections map[string]string
 }
 
+// The remote address is either the client's address or X-Real-Ip, if set.
+// X-Real-Ip must be sent by the forwarding server to us.
+func realAddr(req *http.Request) (addr string) {
+	if headerAddr := req.Header["X-Real-Ip"]; len(headerAddr) > 0 {
+		addr = headerAddr[0]
+	} else {
+		addr = req.RemoteAddr
+	}
+	return
+}
+
 // redirectHandler will redirect the client if the path is found in the
 // redirections map. Otherwise, a 404 is returned.
 func redirectHandler(w http.ResponseWriter, req *http.Request, cfg HandlerConfig) {
-	remoteAddr := "-"
-	if headerAddr := req.Header["X-Real-Ip"]; len(headerAddr) > 0 {
-		remoteAddr = headerAddr[0]
-	}
-
 	if destination, ok := cfg.redirections[req.URL.Path]; ok {
-		log.Println(remoteAddr, "redirected from", req.URL.Path, "to", destination)
+		log.Println(realAddr(req), "redirected from", req.URL.Path, "to", destination)
 		http.Redirect(w, req, destination, *redirectionCode)
 	} else {
-		log.Println(remoteAddr, "sent 404 for", req.URL.Path)
+		log.Println(realAddr(req), "sent 404 for", req.URL.Path)
 		http.NotFound(w, req)
 	}
 }
