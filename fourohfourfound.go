@@ -6,8 +6,10 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -76,10 +78,24 @@ func (redir *Redirector) Get(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+// Put will add a redirection from the PUT path to the path specified in the
+// request's data.
+func (redir *Redirector) Put(w http.ResponseWriter, req *http.Request) {
+	// TODO: Require authorization to change redirections
+	buf := new(bytes.Buffer)
+	io.Copy(buf, req.Body)
+	destination := buf.String()
+
+	redir.redirections[req.URL.Path] = destination
+	log.Println("adding redirection from", req.URL.Path, "to", destination)
+}
+
 func (redir *Redirector) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case "GET":
 		redir.Get(w, req)
+	case "PUT":
+		redir.Put(w, req)
 	}
 }
 
