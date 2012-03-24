@@ -25,7 +25,7 @@ var port *int = flag.Int("port", 4404, "listen port")
 //		"another source":"another destination",
 //		...
 //	}
-var redirectConfig *string = flag.String("config", "config.json", "redirection configuration file")
+var configFile *string = flag.String("config", "config.json", "configuration file")
 
 // The redirection code to send to clients.
 var redirectionCode *int = flag.Int("code", 302, "redirection code")
@@ -71,11 +71,11 @@ func redirectionsFrom(config string) (redirections map[string]string, err error)
 
 func main() {
 	flag.Parse()
-	redirections, err := redirectionsFrom(*redirectConfig)
+	redirections, err := redirectionsFrom(*configFile)
 	if err != nil {
 		log.Fatal("redirectionsFrom: ", err)
 	}
-	log.Printf("%s: %d redirections loaded\n", *redirectConfig, len(redirections))
+	log.Printf("%s: %d redirections loaded\n", *configFile, len(redirections))
 
 	addr := ":" + strconv.Itoa(*port)
 
