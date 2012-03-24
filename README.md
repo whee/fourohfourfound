@@ -42,6 +42,7 @@ Run `fourohfourfound`:
 Optional arguments are `-code=[3xx]`, `-config=[config.json]`, and `-port=[4404]`.
 
 Redirections can be modified at runtime with PUT/DELETE:
+
     $ curl -X PUT -d "/somewhere-else" http://localhost:4404/new-redir
     $ curl http://localhost:4404/new-redir
     <a href="/somewhere-else">Found</a>.
