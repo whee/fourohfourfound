@@ -32,7 +32,7 @@ var redirectionCode *int = flag.Int("code", 302, "redirection code")
 
 // The configuration for the handlers includes the redirection code (e.g., 301) and
 // a mapping of /source to /destination redirections.
-type HandlerConfig struct {
+type handlerConfig struct {
 	code         int
 	redirections map[string]string
 }
@@ -50,7 +50,7 @@ func realAddr(req *http.Request) (addr string) {
 
 // redirectHandler will redirect the client if the path is found in the
 // redirections map. Otherwise, a 404 is returned.
-func redirectHandler(w http.ResponseWriter, req *http.Request, cfg HandlerConfig) {
+func redirectHandler(w http.ResponseWriter, req *http.Request, cfg handlerConfig) {
 	if destination, ok := cfg.redirections[req.URL.Path]; ok {
 		log.Println(realAddr(req), "redirected from", req.URL.Path, "to", destination)
 		http.Redirect(w, req, destination, *redirectionCode)
@@ -60,8 +60,8 @@ func redirectHandler(w http.ResponseWriter, req *http.Request, cfg HandlerConfig
 	}
 }
 
-func makeHandler(fn func(http.ResponseWriter, *http.Request, HandlerConfig),
-	cfg HandlerConfig) http.HandlerFunc {
+func makeHandler(fn func(http.ResponseWriter, *http.Request, handlerConfig),
+	cfg handlerConfig) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		fn(w, r, cfg)
@@ -90,7 +90,7 @@ func main() {
 	log.Printf("%s: %d redirections loaded\n", *configFile, len(redirections))
 
 	addr := ":" + strconv.Itoa(*port)
-	handlerConfig := HandlerConfig{code: *redirectionCode, redirections: redirections}
+	handlerConfig := handlerConfig{code: *redirectionCode, redirections: redirections}
 
 	http.HandleFunc("/", makeHandler(redirectHandler, handlerConfig))
 	err = http.ListenAndServe(addr, nil)
