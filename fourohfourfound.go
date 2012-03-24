@@ -87,14 +87,14 @@ func (redir *Redirector) Put(w http.ResponseWriter, req *http.Request) {
 	destination := buf.String()
 
 	redir.redirections[req.URL.Path] = destination
-	log.Println("adding redirection from", req.URL.Path, "to", destination)
+	log.Println(realAddr(req), "adding redirection from", req.URL.Path, "to", destination)
 }
 
 // Delete removes the redirection at the specified path.
 func (redir *Redirector) Delete(w http.ResponseWriter, req *http.Request) {
 	// TODO: Require authorization to delete redirections
 	delete(redir.redirections, req.URL.Path)
-	log.Println("removed redirection for", req.URL.Path)
+	log.Println(realAddr(req), "removed redirection for", req.URL.Path)
 }
 
 func (redir *Redirector) ServeHTTP(w http.ResponseWriter, req *http.Request) {
