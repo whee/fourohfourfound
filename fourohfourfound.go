@@ -30,15 +30,22 @@ var configFile *string = flag.String("config", "config.json", "configuration fil
 // The redirection code to send to clients.
 var redirectionCode *int = flag.Int("code", 302, "redirection code")
 
+// The configuration for the handlers includes the redirection code (e.g., 301) and
+// a mapping of /source to /destination redirections.
+type HandlerConfig struct {
+	code         int
+	redirections map[string]string
+}
+
 // redirectHandler will redirect the client if the path is found in the
 // redirections map. Otherwise, a 404 is returned.
-func redirectHandler(w http.ResponseWriter, req *http.Request, redirections map[string]string) {
+func redirectHandler(w http.ResponseWriter, req *http.Request, cfg HandlerConfig) {
 	remoteAddr := "-"
 	if headerAddr := req.Header["X-Real-Ip"]; len(headerAddr) > 0 {
 		remoteAddr = headerAddr[0]
 	}
 
-	if destination, ok := redirections[req.URL.Path]; ok {
+	if destination, ok := cfg.redirections[req.URL.Path]; ok {
 		log.Println(remoteAddr, "redirected from", req.URL.Path, "to", destination)
 		http.Redirect(w, req, destination, *redirectionCode)
 	} else {
@@ -47,11 +54,11 @@ func redirectHandler(w http.ResponseWriter, req *http.Request, redirections map[
 	}
 }
 
-func makeHandler(fn func(http.ResponseWriter, *http.Request, map[string]string),
-	redirections map[string]string) http.HandlerFunc {
+func makeHandler(fn func(http.ResponseWriter, *http.Request, HandlerConfig),
+	cfg HandlerConfig) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		fn(w, r, redirections)
+		fn(w, r, cfg)
 	}
 }
 
@@ -65,7 +72,6 @@ func redirectionsFrom(config string) (redirections map[string]string, err error)
 	if err != nil {
 		return
 	}
-
 	return
 }
 
@@ -78,8 +84,9 @@ func main() {
 	log.Printf("%s: %d redirections loaded\n", *configFile, len(redirections))
 
 	addr := ":" + strconv.Itoa(*port)
+	handlerConfig := HandlerConfig{code: *redirectionCode, redirections: redirections}
 
-	http.HandleFunc("/", makeHandler(redirectHandler, redirections))
+	http.HandleFunc("/", makeHandler(redirectHandler, handlerConfig))
 	err = http.ListenAndServe(addr, nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
