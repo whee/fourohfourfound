@@ -90,12 +90,21 @@ func (redir *Redirector) Put(w http.ResponseWriter, req *http.Request) {
 	log.Println("adding redirection from", req.URL.Path, "to", destination)
 }
 
+// Delete removes the redirection at the specified path.
+func (redir *Redirector) Delete(w http.ResponseWriter, req *http.Request) {
+	// TODO: Require authorization to delete redirections
+	delete(redir.redirections, req.URL.Path)
+	log.Println("removed redirection for", req.URL.Path)
+}
+
 func (redir *Redirector) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case "GET":
 		redir.Get(w, req)
 	case "PUT":
 		redir.Put(w, req)
+	case "DELETE":
+		redir.Delete(w, req)
 	}
 }
 
