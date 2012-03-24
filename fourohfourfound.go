@@ -14,6 +14,9 @@ import (
 	"strconv"
 )
 
+// The host to listen on.
+var host *string = flag.String("host", "localhost", "listen host")
+
 // The port to listen on.
 var port *int = flag.Int("port", 4404, "listen port")
 
@@ -88,7 +91,7 @@ func main() {
 	}
 	log.Printf("%s: %d redirections loaded\n", *configFile, len(redirections))
 
-	addr := ":" + strconv.Itoa(*port)
+	addr := *host + ":" + strconv.Itoa(*port)
 	redirector := &Redirector{code: *redirectionCode, redirections: redirections}
 
 	http.Handle("/", redirector)
