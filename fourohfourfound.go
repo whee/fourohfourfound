@@ -48,15 +48,22 @@ func realAddr(req *http.Request) (addr string) {
 	return
 }
 
-// redirectHandler will redirect the client if the path is found in the
-// redirections map. Otherwise, a 404 is returned.
-func redirectHandler(w http.ResponseWriter, req *http.Request, cfg handlerConfig) {
+func getHandler(w http.ResponseWriter, req *http.Request, cfg handlerConfig) {
 	if destination, ok := cfg.redirections[req.URL.Path]; ok {
 		log.Println(realAddr(req), "redirected from", req.URL.Path, "to", destination)
 		http.Redirect(w, req, destination, cfg.code)
 	} else {
 		log.Println(realAddr(req), "sent 404 for", req.URL.Path)
 		http.NotFound(w, req)
+	}
+}
+
+// redirectHandler will redirect the client if the path is found in the
+// redirections map. Otherwise, a 404 is returned.
+func redirectHandler(w http.ResponseWriter, req *http.Request, cfg handlerConfig) {
+	switch req.Method {
+	case "GET":
+		getHandler(w, req, cfg)
 	}
 }
 
