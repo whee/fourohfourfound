@@ -32,7 +32,7 @@ var redirectionCode *int = flag.Int("code", 302, "redirection code")
 
 // The configuration for the handlers includes the redirection code (e.g., 301) and
 // a mapping of /source to /destination redirections.
-type handlerConfig struct {
+type Redirector struct {
 	code         int
 	redirections map[string]string
 }
@@ -48,33 +48,6 @@ func realAddr(req *http.Request) (addr string) {
 	return
 }
 
-func getHandler(w http.ResponseWriter, req *http.Request, cfg handlerConfig) {
-	if destination, ok := cfg.redirections[req.URL.Path]; ok {
-		log.Println(realAddr(req), "redirected from", req.URL.Path, "to", destination)
-		http.Redirect(w, req, destination, cfg.code)
-	} else {
-		log.Println(realAddr(req), "sent 404 for", req.URL.Path)
-		http.NotFound(w, req)
-	}
-}
-
-// redirectHandler will redirect the client if the path is found in the
-// redirections map. Otherwise, a 404 is returned.
-func redirectHandler(w http.ResponseWriter, req *http.Request, cfg handlerConfig) {
-	switch req.Method {
-	case "GET":
-		getHandler(w, req, cfg)
-	}
-}
-
-func makeHandler(fn func(http.ResponseWriter, *http.Request, handlerConfig),
-	cfg handlerConfig) http.HandlerFunc {
-
-	return func(w http.ResponseWriter, r *http.Request) {
-		fn(w, r, cfg)
-	}
-}
-
 // Load the config file and create a redirections map.
 func redirectionsFrom(config string) (redirections map[string]string, err error) {
 	b, err := ioutil.ReadFile(config)
@@ -88,6 +61,25 @@ func redirectionsFrom(config string) (redirections map[string]string, err error)
 	return
 }
 
+// Get will redirect the client if the path is found in the redirections map.
+// Otherwise, a 404 is returned.
+func (redir *Redirector) Get(w http.ResponseWriter, req *http.Request) {
+	if destination, ok := redir.redirections[req.URL.Path]; ok {
+		log.Println(realAddr(req), "redirected from", req.URL.Path, "to", destination)
+		http.Redirect(w, req, destination, redir.code)
+	} else {
+		log.Println(realAddr(req), "sent 404 for", req.URL.Path)
+		http.NotFound(w, req)
+	}
+}
+
+func (redir *Redirector) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	switch req.Method {
+	case "GET":
+		redir.Get(w, req)
+	}
+}
+
 func main() {
 	flag.Parse()
 	redirections, err := redirectionsFrom(*configFile)
@@ -97,9 +89,9 @@ func main() {
 	log.Printf("%s: %d redirections loaded\n", *configFile, len(redirections))
 
 	addr := ":" + strconv.Itoa(*port)
-	handlerConfig := handlerConfig{code: *redirectionCode, redirections: redirections}
+	redirector := &Redirector{code: *redirectionCode, redirections: redirections}
 
-	http.HandleFunc("/", makeHandler(redirectHandler, handlerConfig))
+	http.Handle("/", redirector)
 	err = http.ListenAndServe(addr, nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
