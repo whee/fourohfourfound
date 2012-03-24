@@ -53,7 +53,7 @@ func realAddr(req *http.Request) (addr string) {
 func redirectHandler(w http.ResponseWriter, req *http.Request, cfg handlerConfig) {
 	if destination, ok := cfg.redirections[req.URL.Path]; ok {
 		log.Println(realAddr(req), "redirected from", req.URL.Path, "to", destination)
-		http.Redirect(w, req, destination, *redirectionCode)
+		http.Redirect(w, req, destination, cfg.code)
 	} else {
 		log.Println(realAddr(req), "sent 404 for", req.URL.Path)
 		http.NotFound(w, req)
