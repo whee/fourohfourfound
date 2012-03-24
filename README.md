@@ -25,6 +25,13 @@ would otherwise return a 404.
 
 This assumes fourohfourfound is running on localhost:4404.
 
+Installation
+------------
+
+The usual:
+
+    $ go get github.com/whee/fourohfourfound
+
 Usage
 -----
 
