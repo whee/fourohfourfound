@@ -1,3 +1,5 @@
 {
-	"/test": "/over-here"
+    "redirections": {
+        "/test": "/over-here"
+    }
 }

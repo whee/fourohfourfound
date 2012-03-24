@@ -23,14 +23,17 @@ var host *string = flag.String("host", "localhost", "listen host")
 var port *int = flag.Int("port", 4404, "listen port")
 
 // The location of a JSON configuration file specifying the redirections.
-// The format:
+var configFile *string = flag.String("config", "config.json", "configuration file")
+
+// Configuration file format:
 //
 // 	{
-//		"source":"destination",
+//    "redirections": {
+//	    "source":"destination",
 //		"another source":"another destination",
 //		...
+//	  }
 //	}
-var configFile *string = flag.String("config", "config.json", "configuration file")
 
 // The redirection code to send to clients.
 var redirectionCode *int = flag.Int("code", 302, "redirection code")
@@ -55,13 +58,22 @@ func realAddr(req *http.Request) (addr string) {
 
 // Load the config file and create a redirections map.
 func redirectionsFrom(config string) (redirections map[string]string, err error) {
-	b, err := ioutil.ReadFile(config)
+	bytes, err := ioutil.ReadFile(config)
 	if err != nil {
 		return
 	}
-	err = json.Unmarshal(b, &redirections)
+	var data interface{}
+	err = json.Unmarshal(bytes, &data)
 	if err != nil {
 		return
+	}
+
+	m := data.(map[string]interface{})
+
+	// Populate the redirections map.
+	redirections = make(map[string]string)
+	for k, v := range m["redirections"].(map[string]interface{}) {
+		redirections[k] = v.(string)
 	}
 	return
 }
