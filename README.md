@@ -38,8 +38,10 @@ Usage
 Create a configuration file in JSON format:
 
     {
-      "/source": "/destination",
-      "/another-source": "/another-destination"
+      "redirections": {
+        "/source": "/destination",
+        "/another-source": "/another-destination"
+      }
     }
 
 Run `fourohfourfound`:
