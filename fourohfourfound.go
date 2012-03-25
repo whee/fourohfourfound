@@ -49,11 +49,9 @@ type Redirector struct {
 // X-Real-Ip must be sent by the forwarding server to us.
 func realAddr(req *http.Request) (addr string) {
 	if headerAddr := req.Header.Get("X-Real-Ip"); headerAddr != "" {
-		addr = headerAddr
-	} else {
-		addr = req.RemoteAddr
+		return headerAddr
 	}
-	return
+	return req.RemoteAddr
 }
 
 // Load the config file and create a redirections map.
