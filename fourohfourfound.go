@@ -48,8 +48,8 @@ type Redirector struct {
 // The remote address is either the client's address or X-Real-Ip, if set.
 // X-Real-Ip must be sent by the forwarding server to us.
 func realAddr(req *http.Request) (addr string) {
-	if headerAddr := req.Header["X-Real-Ip"]; len(headerAddr) > 0 {
-		addr = headerAddr[0]
+	if headerAddr := req.Header.Get("X-Real-Ip"); headerAddr != "" {
+		addr = headerAddr
 	} else {
 		addr = req.RemoteAddr
 	}
