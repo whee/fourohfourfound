@@ -67,16 +67,13 @@ func redirectionsFrom(config string) (redirections map[string]string, err error)
 	}
 
 	m := data.(map[string]interface{})
-
-	// See if any redirections are specified in the configuration.
-	if m["redirections"] == nil {
-		return
-	}
+	redirections = make(map[string]string)
 
 	// Populate redirections from the configuration.
-	redirections = make(map[string]string)
-	for k, v := range m["redirections"].(map[string]interface{}) {
-		redirections[k] = v.(string)
+	if m["redirections"] != nil {
+		for k, v := range m["redirections"].(map[string]interface{}) {
+			redirections[k] = v.(string)
+		}
 	}
 	return
 }
