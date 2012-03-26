@@ -28,13 +28,13 @@ var configFile *string = flag.String("config", "config.json", "configuration fil
 
 // Configuration file format:
 //
-// 	{
-//    "redirections": {
-//	    "source":"destination",
-//		"another source":"another destination",
-//		...
-//	  }
-//	}
+// {
+//   "redirections": {
+//     "source":"destination",
+//      "another source":"another destination",
+//      ...
+//   }
+// }
 
 // The redirection code to send to clients.
 var redirectionCode *int = flag.Int("code", 302, "redirection code")
@@ -44,7 +44,12 @@ var redirectionCode *int = flag.Int("code", 302, "redirection code")
 type Redirector struct {
 	code         int
 	mu           sync.RWMutex
-	redirections map[string]string
+	Redirections map[string]string `json:"redirections"`
+}
+
+// Create a new Redirector with a default code of StatusFound (302) and an empty redirections map.
+func NewRedirector() *Redirector {
+	return &Redirector{code: http.StatusFound, Redirections: make(map[string]string)}
 }
 
 // The remote address is either the client's address or X-Real-Ip, if set.
@@ -56,36 +61,12 @@ func realAddr(req *http.Request) (addr string) {
 	return req.RemoteAddr
 }
 
-// Load the config file and create a redirections map.
-func redirectionsFrom(config string) (redirections map[string]string, err error) {
-	bytes, err := ioutil.ReadFile(config)
-	if err != nil {
-		return
-	}
-	var data interface{}
-	err = json.Unmarshal(bytes, &data)
-	if err != nil {
-		return
-	}
-
-	m := data.(map[string]interface{})
-	redirections = make(map[string]string)
-
-	// Populate redirections from the configuration.
-	if m["redirections"] != nil {
-		for k, v := range m["redirections"].(map[string]interface{}) {
-			redirections[k] = v.(string)
-		}
-	}
-	return
-}
-
 // Get will redirect the client if the path is found in the redirections map.
 // Otherwise, a 404 is returned.
 func (redir *Redirector) Get(w http.ResponseWriter, req *http.Request) {
 	redir.mu.RLock()
 	defer redir.mu.RUnlock()
-	if destination, ok := redir.redirections[req.URL.Path]; ok {
+	if destination, ok := redir.Redirections[req.URL.Path]; ok {
 		log.Println(realAddr(req), "redirected from", req.URL.Path, "to", destination)
 		http.Redirect(w, req, destination, redir.code)
 	} else {
@@ -104,8 +85,8 @@ func (redir *Redirector) Put(w http.ResponseWriter, req *http.Request) {
 	io.Copy(buf, req.Body)
 	destination := buf.String()
 
-	redir.redirections[req.URL.Path] = destination
-	log.Println(realAddr(req), "adding redirection from", req.URL.Path, "to", destination)
+	redir.Redirections[req.URL.Path] = destination
+	log.Println(realAddr(req), "added redirection from", req.URL.Path, "to", destination)
 }
 
 // Delete removes the redirection at the specified path.
@@ -113,7 +94,7 @@ func (redir *Redirector) Delete(w http.ResponseWriter, req *http.Request) {
 	redir.mu.Lock()
 	defer redir.mu.Unlock()
 	// TODO: Require authorization to delete redirections
-	delete(redir.redirections, req.URL.Path)
+	delete(redir.Redirections, req.URL.Path)
 	log.Println(realAddr(req), "removed redirection for", req.URL.Path)
 }
 
@@ -125,21 +106,95 @@ func (redir *Redirector) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		redir.Put(w, req)
 	case "DELETE":
 		redir.Delete(w, req)
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// Use the specified JSON configuration to configure the Redirector.
+func (redir *Redirector) LoadConfig(config []byte) (err error) {
+	redir.mu.Lock()
+	defer redir.mu.Unlock()
+	err = json.Unmarshal(config, redir)
+	log.Printf("%d redirections loaded\n", len(redir.Redirections))
+	return
+}
+
+// Read the JSON configuration from a file to configure the Redirector.
+func (redir *Redirector) LoadConfigFile(config string) (err error) {
+	bytes, err := ioutil.ReadFile(config)
+	if err != nil {
+		return
+	}
+	err = redir.LoadConfig(bytes)
+	return
+}
+
+// GETting the config supplies the client with a JSON formatted configuration
+// suitable for storing as the configuration file.
+func (redir *Redirector) GetConfig(w http.ResponseWriter, req *http.Request) {
+	redir.mu.RLock()
+	defer redir.mu.RUnlock()
+	jsonConfig, err := json.MarshalIndent(redir, "", "  ")
+	if err != nil {
+		http.Error(w, "Error encoding JSON config", http.StatusInternalServerError)
+		return
+	}
+	io.WriteString(w, string(jsonConfig))
+}
+
+// Set the Redirector configuration from the JSON supplied in the PUT
+// request's data.
+func (redir *Redirector) SetConfig(w http.ResponseWriter, req *http.Request) {
+	buf := new(bytes.Buffer)
+	io.Copy(buf, req.Body)
+	err := redir.LoadConfig(buf.Bytes())
+	if err != nil {
+		http.Error(w, "Error decoding JSON config", http.StatusInternalServerError)
+		return
+	}
+	io.WriteString(w, "Configuration successfully loaded.\n")
+}
+
+// When deleted, the Redirector configuration is emptied.
+func (redir *Redirector) DeleteConfig(w http.ResponseWriter, req *http.Request) {
+	redir.mu.Lock()
+	defer redir.mu.Unlock()
+	redir.Redirections = make(map[string]string)
+}
+
+// The ConfigHandler handles retrieving the Redirector configuration (GET) and
+// setting it (PUT) through the configuration path.
+func (redir *Redirector) ConfigHandler() func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, req *http.Request) {
+		log.Println(realAddr(req), req.Method, req.URL.Path)
+		switch req.Method {
+		case "GET":
+			redir.GetConfig(w, req)
+		case "PUT":
+			redir.SetConfig(w, req)
+		case "DELETE":
+			redir.DeleteConfig(w, req)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
 	}
 }
 
 func main() {
 	flag.Parse()
-	redirections, err := redirectionsFrom(*configFile)
-	if err != nil {
-		log.Fatal("redirectionsFrom: ", err)
-	}
-	log.Printf("%s: %d redirections loaded\n", *configFile, len(redirections))
-
 	addr := *host + ":" + strconv.Itoa(*port)
-	redirector := &Redirector{code: *redirectionCode, redirections: redirections}
+
+	redirector := NewRedirector()
+	redirector.code = *redirectionCode
+
+	err := redirector.LoadConfigFile(*configFile)
+	if err != nil {
+		log.Fatal("LoadConfigFile: ", err)
+	}
 
 	http.Handle("/", redirector)
+	http.HandleFunc("/_config", redirector.ConfigHandler())
 	err = http.ListenAndServe(addr, nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
