@@ -14,6 +14,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"sync"
 )
 
 // The host to listen on.
@@ -42,6 +43,7 @@ var redirectionCode *int = flag.Int("code", 302, "redirection code")
 // a mapping of /source to /destination redirections.
 type Redirector struct {
 	code         int
+	mu           sync.RWMutex
 	redirections map[string]string
 }
 
@@ -81,6 +83,8 @@ func redirectionsFrom(config string) (redirections map[string]string, err error)
 // Get will redirect the client if the path is found in the redirections map.
 // Otherwise, a 404 is returned.
 func (redir *Redirector) Get(w http.ResponseWriter, req *http.Request) {
+	redir.mu.RLock()
+	defer redir.mu.RUnlock()
 	if destination, ok := redir.redirections[req.URL.Path]; ok {
 		log.Println(realAddr(req), "redirected from", req.URL.Path, "to", destination)
 		http.Redirect(w, req, destination, redir.code)
@@ -93,6 +97,8 @@ func (redir *Redirector) Get(w http.ResponseWriter, req *http.Request) {
 // Put will add a redirection from the PUT path to the path specified in the
 // request's data.
 func (redir *Redirector) Put(w http.ResponseWriter, req *http.Request) {
+	redir.mu.Lock()
+	defer redir.mu.Unlock()
 	// TODO: Require authorization to change redirections
 	buf := new(bytes.Buffer)
 	io.Copy(buf, req.Body)
@@ -104,6 +110,8 @@ func (redir *Redirector) Put(w http.ResponseWriter, req *http.Request) {
 
 // Delete removes the redirection at the specified path.
 func (redir *Redirector) Delete(w http.ResponseWriter, req *http.Request) {
+	redir.mu.Lock()
+	defer redir.mu.Unlock()
 	// TODO: Require authorization to delete redirections
 	delete(redir.redirections, req.URL.Path)
 	log.Println(realAddr(req), "removed redirection for", req.URL.Path)
