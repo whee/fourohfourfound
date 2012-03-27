@@ -14,6 +14,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -61,6 +62,20 @@ func realAddr(req *http.Request) (addr string) {
 	return req.RemoteAddr
 }
 
+// A handler wrapped with onlyLocal will return http.StatusUnauthorized if the client
+// is not localhost. The upstream server must send X-Real-Ip to work properly.
+func onlyLocal(w http.ResponseWriter, req *http.Request, fn func()) {
+	addr := strings.SplitN(realAddr(req), ":", 2)[0]
+	switch addr {
+	case "localhost":
+		fallthrough
+	case "127.0.0.1":
+		fn()
+	default:
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+	}
+}
+
 // Get will redirect the client if the path is found in the redirections map.
 // Otherwise, a 404 is returned.
 func (redir *Redirector) Get(w http.ResponseWriter, req *http.Request) {
@@ -103,9 +118,9 @@ func (redir *Redirector) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	case "GET":
 		redir.Get(w, req)
 	case "PUT":
-		redir.Put(w, req)
+		onlyLocal(w, req, func() { redir.Put(w, req) })
 	case "DELETE":
-		redir.Delete(w, req)
+		onlyLocal(w, req, func() { redir.Delete(w, req) })
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -168,16 +183,19 @@ func (redir *Redirector) DeleteConfig(w http.ResponseWriter, req *http.Request) 
 func (redir *Redirector) ConfigHandler() func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, req *http.Request) {
 		log.Println(realAddr(req), req.Method, req.URL.Path)
-		switch req.Method {
-		case "GET":
-			redir.GetConfig(w, req)
-		case "PUT":
-			redir.SetConfig(w, req)
-		case "DELETE":
-			redir.DeleteConfig(w, req)
-		default:
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		}
+		onlyLocal(w, req,
+			func() {
+				switch req.Method {
+				case "GET":
+					redir.GetConfig(w, req)
+				case "PUT":
+					redir.SetConfig(w, req)
+				case "DELETE":
+					redir.DeleteConfig(w, req)
+				default:
+					http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+				}
+			})
 	}
 }
 
