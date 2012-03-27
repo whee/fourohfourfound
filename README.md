@@ -60,7 +60,24 @@ Redirections can be modified at runtime with PUT/DELETE:
     $ curl http://localhost:4404/new-redir
     404 page not found
 
-These are not yet persistent.
+These are not yet persistent. You can retrieve the current configuration, 
+suitable for saving to a file:
+
+    $ curl http://localhost:4404/_config
+    {
+      "redirections": {
+        "/source": "/destination",
+        "/another-source": "/another-destination"
+      }
+    }
+
+You can also PUT a JSON configuration to /_config:
+
+    $ curl -X PUT -d"@config.json" http://localhost:4404/_config
+    Configuration successfully loaded.
+
+Redirections in the JSON configuration are _in addition_ to those already 
+active. DELETEing /_config will remove all redirections.
 
 Notes
 -----
