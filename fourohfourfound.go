@@ -67,9 +67,7 @@ func realAddr(req *http.Request) (addr string) {
 func onlyLocal(w http.ResponseWriter, req *http.Request, fn func()) {
 	addr := strings.SplitN(realAddr(req), ":", 2)[0]
 	switch addr {
-	case "localhost":
-		fallthrough
-	case "127.0.0.1":
+	case "localhost", "127.0.0.1":
 		fn()
 	default:
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
