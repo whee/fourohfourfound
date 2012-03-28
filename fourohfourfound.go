@@ -79,6 +79,7 @@ func onlyLocal(w http.ResponseWriter, req *http.Request, fn func()) {
 func (redir *Redirector) Get(w http.ResponseWriter, req *http.Request) {
 	redir.mu.RLock()
 	defer redir.mu.RUnlock()
+
 	if destination, ok := redir.Redirections[req.URL.Path]; ok {
 		log.Println(realAddr(req), "redirected from", req.URL.Path, "to", destination)
 		http.Redirect(w, req, destination, redir.code)
@@ -93,6 +94,7 @@ func (redir *Redirector) Get(w http.ResponseWriter, req *http.Request) {
 func (redir *Redirector) Put(w http.ResponseWriter, req *http.Request) {
 	redir.mu.Lock()
 	defer redir.mu.Unlock()
+
 	// TODO: Require authorization to change redirections
 	buf := new(bytes.Buffer)
 	io.Copy(buf, req.Body)
@@ -106,6 +108,7 @@ func (redir *Redirector) Put(w http.ResponseWriter, req *http.Request) {
 func (redir *Redirector) Delete(w http.ResponseWriter, req *http.Request) {
 	redir.mu.Lock()
 	defer redir.mu.Unlock()
+
 	// TODO: Require authorization to delete redirections
 	delete(redir.Redirections, req.URL.Path)
 	log.Println(realAddr(req), "removed redirection for", req.URL.Path)
@@ -128,6 +131,7 @@ func (redir *Redirector) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 func (redir *Redirector) LoadConfig(config []byte) (err error) {
 	redir.mu.Lock()
 	defer redir.mu.Unlock()
+
 	err = json.Unmarshal(config, redir)
 	log.Printf("%d redirections loaded\n", len(redir.Redirections))
 	return
@@ -148,6 +152,7 @@ func (redir *Redirector) LoadConfigFile(config string) (err error) {
 func (redir *Redirector) GetConfig(w http.ResponseWriter, req *http.Request) {
 	redir.mu.RLock()
 	defer redir.mu.RUnlock()
+
 	jsonConfig, err := json.MarshalIndent(redir, "", "  ")
 	if err != nil {
 		http.Error(w, "Error encoding JSON config", http.StatusInternalServerError)
@@ -173,6 +178,7 @@ func (redir *Redirector) SetConfig(w http.ResponseWriter, req *http.Request) {
 func (redir *Redirector) DeleteConfig(w http.ResponseWriter, req *http.Request) {
 	redir.mu.Lock()
 	defer redir.mu.Unlock()
+
 	redir.Redirections = make(map[string]string)
 }
 
